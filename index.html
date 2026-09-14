@@ -334,9 +334,6 @@
 
 <button id="btn-mute" class="mute-toggle hidden" aria-label="Mute music" aria-pressed="false">🔊</button>
 
-<audio id="bgm" loop preload="none" src="music.mp3"></audio>
-<!-- Replace music.mp3 above with a real royalty-free track before shipping. -->
-
 <div id="stage">
   <div id="tilt-layer">
 
@@ -499,8 +496,7 @@
       },
       submitBtn: "Plan lock karo",
       hintMissing: "Teeno choose karo pehle 🙂",
-      resultHeading: "Plan locked 💌",
-      formspreeUrl: "https://formspree.io/f/your-form-id"
+      resultHeading: "Plan locked 💌"
     }
   };
 
@@ -778,7 +774,7 @@
     setTimeout(() => env.classList.add('open'), 300);
     setTimeout(() => card.classList.add('revealed'), 800);
     setTimeout(() => card.classList.add('floating'), 1450);
-    revealMusic();
+    Music.start();
   }
 
   /* ---------- SCENE 5: THE PLAN ---------- */
@@ -809,7 +805,7 @@
     });
   }
 
-  async function submitPlan(){
+  function submitPlan(){
     const { day, vibe, food } = state.answers;
     const hint = $('plan-hint');
     if (!day || !vibe || !food){
@@ -817,42 +813,114 @@
       return;
     }
     hint.textContent = '';
-    try {
-      await fetch(CONTENT.scene5.formspreeUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify({ day, vibe, food })
-      });
-    } catch (e) { /* offline or failed — still show confirmation */ }
-
     $('plan-form').classList.add('hidden');
     $('plan-result').classList.remove('hidden');
     $('plan-summary').textContent = day + ' · ' + vibe + ' · ' + food;
   }
 
-  /* ---------- AUDIO ---------- */
-  const bgm = $('bgm');
-  let audioUnlocked = false;
+  /* ---------- MUSIC (synthesized, no audio file needed) ---------- */
+  const Music = (function(){
+    const VOLUME = 0.22;
+    const STEP = 0.5;
+    // Am – F – C/G – G, arpeggiated
+    const CHORDS = [
+      [220.00, 261.63, 329.63],
+      [174.61, 220.00, 261.63],
+      [196.00, 261.63, 329.63],
+      [196.00, 246.94, 293.66]
+    ];
+    const PATTERN = [0, 1, 2, 1];
 
-  function unlockAudio(){
-    if (audioUnlocked) return;
-    audioUnlocked = true;
-    bgm.muted = true;
-    bgm.play().catch(() => {});
-  }
+    let ctx = null, master = null, voices = null, timer = null;
+    let step = 0, nextTime = 0, muted = false;
 
-  function revealMusic(){
-    bgm.muted = false;
-    bgm.play().catch(() => {});
-    $('btn-mute').classList.remove('hidden');
-  }
+    function ensure(){
+      if (ctx) return true;
+      try {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return false;
+        ctx = new AC();
+        master = ctx.createGain();
+        master.gain.value = 0;
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.value = 1600;
+        const delay = ctx.createDelay(1);
+        delay.delayTime.value = 0.32;
+        const feedback = ctx.createGain();
+        feedback.gain.value = 0.28;
+        delay.connect(feedback);
+        feedback.connect(delay);
+        filter.connect(master);
+        filter.connect(delay);
+        delay.connect(master);
+        master.connect(ctx.destination);
+        voices = filter;
+        return true;
+      } catch (e) { return false; }
+    }
+
+    function note(freq, at, dur, vol, type){
+      const osc = ctx.createOscillator();
+      const g = ctx.createGain();
+      osc.type = type || 'sine';
+      osc.frequency.value = freq;
+      g.gain.setValueAtTime(0.0001, at);
+      g.gain.linearRampToValueAtTime(vol, at + 0.09);
+      g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+      osc.connect(g);
+      g.connect(voices);
+      osc.start(at);
+      osc.stop(at + dur + 0.05);
+    }
+
+    function schedule(){
+      if (!ctx) return;
+      while (nextTime < ctx.currentTime + 0.25){
+        const chord = CHORDS[Math.floor(step / 4) % CHORDS.length];
+        note(chord[PATTERN[step % 4]] * 2, nextTime, 1.7, 0.16);
+        if (step % 4 === 0){
+          note(chord[0] / 2, nextTime, 3.4, 0.10, 'triangle');
+          note(chord[2], nextTime, 3.4, 0.05);
+        }
+        nextTime += STEP;
+        step++;
+      }
+    }
+
+    function unlock(){
+      if (!ensure()) return;
+      if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+    }
+
+    function start(){
+      if (!ensure()) return;
+      if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+      if (!timer){
+        nextTime = ctx.currentTime + 0.1;
+        timer = setInterval(schedule, 60);
+      }
+      if (!muted) master.gain.linearRampToValueAtTime(VOLUME, ctx.currentTime + 2.5);
+      $('btn-mute').classList.remove('hidden');
+    }
+
+    function toggle(){
+      if (!ctx) return muted;
+      muted = !muted;
+      master.gain.cancelScheduledValues(ctx.currentTime);
+      master.gain.linearRampToValueAtTime(muted ? 0.0001 : VOLUME, ctx.currentTime + 0.4);
+      return muted;
+    }
+
+    return { unlock, start, toggle };
+  })();
 
   $('btn-mute').addEventListener('click', () => {
-    bgm.muted = !bgm.muted;
+    const isMuted = Music.toggle();
     const btn = $('btn-mute');
-    btn.textContent = bgm.muted ? '🔇' : '🔊';
-    btn.setAttribute('aria-pressed', String(!bgm.muted));
-    btn.setAttribute('aria-label', bgm.muted ? 'Unmute music' : 'Mute music');
+    btn.textContent = isMuted ? '🔇' : '🔊';
+    btn.setAttribute('aria-pressed', String(!isMuted));
+    btn.setAttribute('aria-label', isMuted ? 'Unmute music' : 'Mute music');
   });
 
   /* ---------- TILT (desktop pointer / mobile deviceorientation) ---------- */
@@ -963,7 +1031,7 @@
   /* ---------- WIRE UP ---------- */
   function wireEvents(){
     $('btn-open').addEventListener('click', () => {
-      unlockAudio();
+      Music.unlock();
       Tilt.requestMobilePermission();
       goToScene(2);
     });
