@@ -1,0 +1,985 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Bhavya, Case File #001</title>
+<meta name="description" content="Ek 3D sorry.">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<script src="https://cdn.tailwindcss.com"></script>
+
+<style>
+  :root{
+    --bg:#FDF6EC;
+    --accent:#E8909C;
+    --accent-dark:#D97A8A;
+    --accent-light:#F6D3D9;
+    --text:#3A3238;
+    --card:#FFFFFF;
+    --perspective:1200px;
+  }
+  @media (max-width:639px){
+    :root{ --perspective:800px; }
+  }
+  *{ box-sizing:border-box; }
+  html,body{ height:100%; overflow-x:hidden; }
+  html.reduced-motion *, html.reduced-motion *::before, html.reduced-motion *::after{
+    animation:none !important;
+    transition-duration:.25s !important;
+  }
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Inter',sans-serif;
+    overflow-x:hidden;
+    min-height:100dvh;
+    position:relative;
+    -webkit-tap-highlight-color:transparent;
+  }
+  body::before{
+    content:"";
+    position:fixed;
+    inset:0;
+    background:radial-gradient(circle at 50% 18%, rgba(232,144,156,.38), transparent 60%);
+    pointer-events:none;
+    z-index:1;
+  }
+  .font-caveat{ font-family:'Caveat',cursive; }
+  button{
+    touch-action:manipulation;
+    -webkit-tap-highlight-color:transparent;
+    font-family:inherit;
+    cursor:pointer;
+  }
+  button:focus-visible, .chip:focus-visible{
+    outline:3px solid var(--accent-dark);
+    outline-offset:2px;
+  }
+
+  #bg-canvas{
+    position:fixed;
+    inset:0;
+    width:100%;
+    height:100%;
+    z-index:0;
+    display:block;
+  }
+  html.reduced-motion #bg-canvas{ display:none; }
+
+  #stage{
+    position:relative;
+    width:100%;
+    min-height:100dvh;
+    perspective:var(--perspective);
+    z-index:2;
+  }
+  #tilt-layer{
+    position:relative;
+    width:100%;
+    min-height:100dvh;
+    transform-style:preserve-3d;
+  }
+  html.reduced-motion #tilt-layer{ transform:none !important; }
+
+  .scene{
+    position:absolute;
+    inset:0;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    padding:1.5rem 1rem;
+    padding-top:max(1.5rem, env(safe-area-inset-top));
+    padding-bottom:max(1.5rem, env(safe-area-inset-bottom));
+    transform-style:preserve-3d;
+    transform:rotateY(90deg);
+    opacity:0;
+    pointer-events:none;
+    transition:transform .5s cubic-bezier(.4,0,.2,1), opacity .5s ease;
+    overflow-y:auto;
+    -webkit-overflow-scrolling:touch;
+  }
+  .scene.active{
+    transform:rotateY(0deg);
+    opacity:1;
+    pointer-events:auto;
+  }
+  html.reduced-motion .scene{ transform:none !important; }
+
+  /* Primary 3D buttons */
+  .btn-3d{
+    position:relative;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    min-height:44px;
+    padding:1rem 2rem;
+    font-weight:600;
+    font-size:1rem;
+    color:#fff;
+    background:var(--accent);
+    border:none;
+    border-radius:1.25rem;
+    transform-style:preserve-3d;
+    transform:translateZ(6px);
+    transition:transform .12s ease;
+  }
+  .btn-3d::after{
+    content:"";
+    position:absolute;
+    left:0; right:0; top:0; bottom:-6px;
+    background:var(--accent-dark);
+    border-radius:inherit;
+    transform:translateZ(-6px);
+    z-index:-1;
+  }
+  .btn-3d:active{ transform:translateZ(0); }
+  .btn-3d:disabled{ opacity:.6; }
+
+  .btn-option{
+    position:relative;
+    display:block;
+    width:100%;
+    text-align:left;
+    min-height:44px;
+    padding:1rem 1.25rem;
+    margin-top:.6rem;
+    border-radius:1rem;
+    border:2px solid var(--accent-light);
+    background:#fff;
+    color:var(--text);
+    font-weight:500;
+    box-shadow:0 4px 0 var(--accent-light), 0 8px 18px rgba(58,50,56,.08);
+    transform:translateZ(0);
+    transition:transform .12s ease, box-shadow .12s ease, border-color .12s ease, background .12s ease;
+  }
+  .btn-option:active{
+    transform:translateY(3px);
+    box-shadow:0 1px 0 var(--accent-light), 0 3px 8px rgba(58,50,56,.08);
+    background:var(--accent-light);
+  }
+  .btn-option:disabled{ opacity:.55; }
+  @media (hover:hover){
+    .btn-option:hover{ border-color:var(--accent); }
+  }
+
+  .chip{
+    min-height:44px;
+    padding:.9rem 1.25rem;
+    border-radius:9999px;
+    border:2px solid var(--accent-light);
+    background:#fff;
+    color:var(--text);
+    font-weight:500;
+    box-shadow:0 3px 0 var(--accent-light), 0 6px 14px rgba(58,50,56,.08);
+    transform:translateZ(0);
+    transition:transform .12s ease, box-shadow .12s ease, background .12s ease, color .12s ease, border-color .12s ease;
+  }
+  .chip:active{ transform:translateY(2px); box-shadow:0 1px 0 var(--accent-light), 0 2px 6px rgba(58,50,56,.08); }
+  .chip.selected{
+    background:var(--accent);
+    border-color:var(--accent);
+    color:#fff;
+    box-shadow:0 3px 0 var(--accent-dark), 0 6px 14px rgba(58,50,56,.14);
+  }
+  .chip-row{ display:flex; flex-wrap:wrap; gap:.6rem; margin-top:.5rem; }
+  .plan-row{ margin-top:1.25rem; }
+  .plan-row:first-child{ margin-top:0; }
+  .plan-label{ font-weight:600; opacity:.85; }
+
+  .card-surface{
+    width:100%;
+    max-width:380px;
+    margin:0 auto;
+    background:var(--card);
+    border-radius:1.75rem;
+    padding:1.75rem 1.5rem;
+    box-shadow:0 2px 4px rgba(58,50,56,.06), 0 12px 24px rgba(58,50,56,.10), 0 24px 48px rgba(58,50,56,.08);
+    transform-style:preserve-3d;
+    transition:transform .35s ease, opacity .35s ease;
+  }
+  .card-surface.flipping{ transform:rotateY(90deg); opacity:0; }
+  html.reduced-motion .card-surface.flipping{ transform:none !important; opacity:1 !important; }
+  .hidden{ display:none !important; }
+
+  /* Envelope */
+  .envelope-wrap{ perspective:600px; }
+  .envelope{
+    position:relative;
+    width:200px;
+    height:140px;
+    margin:0 auto;
+    transform-style:preserve-3d;
+  }
+  .envelope.drift{ animation:envelope-drift 8s ease-in-out infinite; }
+  .envelope.idle{ animation:envelope-idle 3s ease-in-out infinite; }
+  @keyframes envelope-drift{
+    0%{ transform:translateY(0) rotateY(0deg); }
+    50%{ transform:translateY(-10px) rotateY(180deg); }
+    100%{ transform:translateY(0) rotateY(360deg); }
+  }
+  @keyframes envelope-idle{
+    0%,100%{ transform:translateY(0); }
+    50%{ transform:translateY(-6px); }
+  }
+  .env-back{
+    position:absolute; inset:0;
+    background:var(--accent-light);
+    border-radius:12px;
+    transform:translateZ(-8px);
+    box-shadow:0 14px 34px rgba(58,50,56,.22);
+  }
+  .env-left, .env-right{
+    position:absolute; top:0; width:50%; height:100%;
+    background:var(--accent);
+    transform:translateZ(-4px);
+  }
+  .env-left{ left:0; clip-path:polygon(0 0,100% 50%,0 100%); }
+  .env-right{ right:0; clip-path:polygon(100% 0,0 50%,100% 100%); }
+  .env-front{
+    position:absolute; left:0; right:0; bottom:0; height:65%;
+    background:var(--accent);
+    border-radius:0 0 12px 12px;
+    transform:translateZ(2px);
+  }
+  .env-top{
+    position:absolute; left:0; right:0; top:0; height:55%;
+    background:var(--accent-dark);
+    clip-path:polygon(0 0,100% 0,50% 100%);
+    transform-origin:top center;
+    transform:translateZ(4px) rotateX(0deg);
+    transition:transform .8s cubic-bezier(.4,0,.2,1);
+    z-index:2;
+  }
+  .envelope.open .env-top{ transform:translateZ(4px) rotateX(180deg); }
+
+  .sorry-card{
+    position:absolute;
+    left:50%; top:18%;
+    transform:translate(-50%,20px) scale(.8);
+    opacity:0;
+    transform-style:preserve-3d;
+    pointer-events:none;
+    z-index:1;
+    background:#fff;
+    border-radius:1.5rem;
+    padding:1.5rem 1.75rem;
+    box-shadow:0 16px 36px rgba(58,50,56,.18);
+    transition:transform .6s cubic-bezier(.34,1.56,.64,1), opacity .6s ease;
+  }
+  .sorry-card.revealed{
+    transform:translate(-50%,-170px) scale(1);
+    opacity:1;
+    z-index:3;
+  }
+  .sorry-card.floating{
+    animation:sorry-float 4s ease-in-out infinite;
+  }
+  @keyframes sorry-float{
+    0%,100%{ transform:translate(-50%,-170px) rotateY(0deg) translateZ(0); }
+    50%{ transform:translate(-50%,-180px) rotateY(14deg) translateZ(24px); }
+  }
+  .sorry-text{
+    font-size:clamp(4rem, 22vw, 10rem);
+    line-height:1;
+    color:var(--accent-dark);
+    white-space:nowrap;
+  }
+
+  /* Playground for scene 2 */
+  .playground{
+    position:relative;
+    width:100%;
+    max-width:360px;
+    height:260px;
+    margin:2rem auto 0;
+  }
+  .btn-yes{
+    position:absolute;
+    left:50%; top:50%;
+    transform:translate(-50%,-50%) translateZ(6px) scale(1);
+  }
+  .btn-no{
+    position:absolute;
+    left:0; top:0;
+  }
+
+  .mute-toggle{
+    position:fixed;
+    top:max(.75rem, env(safe-area-inset-top));
+    right:max(.75rem, env(safe-area-inset-right));
+    width:44px; height:44px;
+    border-radius:9999px;
+    background:rgba(255,255,255,.9);
+    border:none;
+    display:flex; align-items:center; justify-content:center;
+    font-size:1.1rem;
+    box-shadow:0 4px 14px rgba(58,50,56,.16);
+    z-index:50;
+  }
+
+  .quiz-feedback{ min-height:1.4em; font-weight:500; }
+  .quiz-feedback.right{ color:#3f8a5b; }
+  .quiz-feedback.wrong{ color:var(--accent-dark); }
+</style>
+</head>
+<body>
+
+<canvas id="bg-canvas" aria-hidden="true"></canvas>
+
+<button id="btn-mute" class="mute-toggle hidden" aria-label="Mute music" aria-pressed="false">🔊</button>
+
+<audio id="bgm" loop preload="none" src="music.mp3"></audio>
+<!-- Replace music.mp3 above with a real royalty-free track before shipping. -->
+
+<div id="stage">
+  <div id="tilt-layer">
+
+    <!-- SCENE 1: INTRO -->
+    <section id="scene-1" class="scene active" aria-label="Introduction">
+      <div class="envelope-wrap mb-8" aria-hidden="true">
+        <div class="envelope drift" id="envelope-intro">
+          <div class="env-back"></div>
+          <div class="env-left"></div>
+          <div class="env-right"></div>
+          <div class="env-front"></div>
+          <div class="env-top"></div>
+        </div>
+      </div>
+      <h1 class="font-caveat text-center leading-none px-2" style="font-size:clamp(2.2rem,9vw,3.5rem)"></h1>
+      <p class="text-center mt-3 max-w-xs mx-auto opacity-80 px-2"></p>
+      <button id="btn-open" class="btn-3d mt-10"></button>
+    </section>
+
+    <!-- SCENE 2: THE QUESTION -->
+    <section id="scene-2" class="scene" aria-label="The question">
+      <h2 class="font-caveat text-center px-2" style="font-size:clamp(2rem,8vw,3rem)"></h2>
+      <div id="playground" class="playground">
+        <button id="btn-yes" class="btn-3d btn-yes" aria-label="Haan"></button>
+        <button id="btn-no" class="btn-3d btn-no" aria-label="Nahi" aria-live="polite"></button>
+      </div>
+    </section>
+
+    <!-- SCENE 3: PUZZLES -->
+    <section id="scene-3" class="scene" aria-label="Puzzles">
+      <div class="w-full">
+        <div class="card-surface" id="quiz-card">
+          <p class="text-sm opacity-60 font-semibold" id="quiz-progress"></p>
+          <h3 class="font-caveat mt-1" id="quiz-question" style="font-size:clamp(1.5rem,6vw,2.2rem)"></h3>
+          <div id="quiz-options" class="mt-4"></div>
+          <p id="quiz-feedback" class="quiz-feedback mt-3" role="status" aria-live="polite"></p>
+        </div>
+        <div class="card-surface result-card hidden text-center" id="result-card">
+          <h3 class="font-caveat" style="font-size:clamp(2rem,8vw,2.8rem)">Result</h3>
+          <p id="result-score" class="mt-2 text-lg font-semibold"></p>
+          <p id="result-rank" class="font-caveat mt-1" style="font-size:clamp(1.5rem,6vw,2rem)"></p>
+          <button id="btn-continue-3" class="btn-3d mt-6" aria-label="Continue to the sorry"></button>
+        </div>
+      </div>
+    </section>
+
+    <!-- SCENE 4: THE SORRY -->
+    <section id="scene-4" class="scene" aria-label="The sorry">
+      <div class="envelope-wrap mb-6" aria-hidden="true">
+        <div class="envelope idle" id="envelope-reveal">
+          <div class="env-back"></div>
+          <div class="env-left"></div>
+          <div class="env-right"></div>
+          <div class="env-front"></div>
+          <div class="env-top"></div>
+          <div class="sorry-card" id="sorry-card">
+            <span class="font-caveat sorry-text">Sorry</span>
+          </div>
+        </div>
+      </div>
+      <button id="btn-continue-4" class="btn-3d mt-10" aria-label="Continue to the plan"></button>
+    </section>
+
+    <!-- SCENE 5: THE PLAN -->
+    <section id="scene-5" class="scene" aria-label="The plan">
+      <h2 class="font-caveat text-center px-2" style="font-size:clamp(2rem,8vw,3rem)"></h2>
+      <div class="w-full max-w-sm mt-6" id="plan-form">
+        <div class="plan-row">
+          <p class="plan-label" id="label-day"></p>
+          <div class="chip-row" data-group="day"></div>
+        </div>
+        <div class="plan-row">
+          <p class="plan-label" id="label-vibe"></p>
+          <div class="chip-row" data-group="vibe"></div>
+        </div>
+        <div class="plan-row">
+          <p class="plan-label" id="label-food"></p>
+          <div class="chip-row" data-group="food"></div>
+        </div>
+        <button id="btn-submit-plan" class="btn-3d w-full mt-6" aria-label="Submit plan"></button>
+        <p id="plan-hint" class="text-center text-sm mt-2 opacity-70" role="status" aria-live="polite"></p>
+      </div>
+      <div class="card-surface result-card hidden text-center" id="plan-result">
+        <h3 class="font-caveat" style="font-size:clamp(2rem,8vw,2.8rem)"></h3>
+        <p id="plan-summary" class="mt-3"></p>
+      </div>
+    </section>
+
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ---------- CONTENT (edit all copy here) ---------- */
+  const CONTENT = {
+    scene1: {
+      heading: "Bhavya, Case File #001",
+      sub: "Khulne se pehle 4 sawaal. Cheating allowed nahi hai.",
+      button: "Kholo"
+    },
+    scene2: {
+      heading: "Bhavya, ek aur chance dogi?",
+      yes: "Haan",
+      noLabels: ["Nahi","Pakka?","Soch lo","Arre suno to","Haath nahi dukhe?","Ye button thak gaya hai"]
+    },
+    scene3: {
+      questions: [
+        {
+          text: "Aisi kaunsi cheez hai jo main baar baar todta hoon, par tum phir bhi maaf kar deti ho?",
+          options: ["Promise","Plate","Diet","WiFi"],
+          correct: 0,
+          roast: "Plate to maine sach me todi thi, par jawab nahi.",
+          right: "Bilkul sahi. Promise abhi bhi ek dhaaga hai jo tootta nahi."
+        },
+        {
+          text: "Mere paas keys hain par koi taala nahi khulta. Space hai par jagah nahi. Main kya hoon?",
+          options: ["Keyboard","Tumhara dil","Almari","Car"],
+          correct: 0,
+          roast: "Close tha. Par main itna romantic nahi hoon.",
+          right: "Sahi! Dekha, itna bhi mushkil nahi tha."
+        },
+        {
+          text: "Aisi kaunsi jagah hai jahan 'kal' hamesha 'aaj' se pehle aata hai?",
+          options: ["Dictionary","Sapne","Calendar","Mera dimaag"],
+          correct: 0,
+          roast: "Mera dimaag? Wahan to kuch bhi order me nahi hai.",
+          right: "Sahi jawab, dictionary jeet gayi."
+        },
+        {
+          text: "Maine aaj tak 47 baar sorry bola. Har sorry ki ek chocolate. Tumhe kitni chocolate milegi?",
+          options: ["47","48, ek advance me","Ek bhi nahi, tum bhool jaoge","Poori dukaan"],
+          correct: 2,
+          roast: "Itni chocolate kahan se launga? Firse socho.",
+          right: "Sahi jawab. Isliye ye website bana raha hoon."
+        }
+      ],
+      ranks: {
+        4: "Detective Bhavya",
+        3: "Kaafi close",
+        2: "Chalega",
+        low: "Tumne jaan bujh ke galat kiya na?"
+      },
+      continueBtn: "Aage"
+    },
+    scene4: {
+      continueBtn: "Aage badho"
+    },
+    scene5: {
+      heading: "Ab tum decide karo, Bhavya",
+      labels: { day: "Din", vibe: "Vibe", food: "Khaana" },
+      options: {
+        day: ["Weekend pe","Jab tum bolo"],
+        vibe: ["Date night","Movie marathon"],
+        food: ["Pizza","Momos","Chinese","Ice cream"]
+      },
+      submitBtn: "Plan lock karo",
+      hintMissing: "Teeno choose karo pehle 🙂",
+      resultHeading: "Plan locked 💌",
+      formspreeUrl: "https://formspree.io/f/your-form-id"
+    }
+  };
+
+  /* ---------- STATE ---------- */
+  const state = {
+    scene: 1,
+    noClicks: 0,
+    score: 0,
+    quizIndex: 0,
+    wrongOnCurrent: false,
+    answers: { day: null, vibe: null, food: null }
+  };
+
+  const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (prefersReducedMotion) document.documentElement.classList.add('reduced-motion');
+
+  const $ = (id) => document.getElementById(id);
+
+  /* ---------- STATIC TEXT INJECTION ---------- */
+  function paintStaticContent(){
+    document.querySelector('#scene-1 h1').textContent = CONTENT.scene1.heading;
+    document.querySelector('#scene-1 p').textContent = CONTENT.scene1.sub;
+    $('btn-open').textContent = CONTENT.scene1.button;
+    $('btn-open').setAttribute('aria-label', CONTENT.scene1.button + ' — start');
+
+    document.querySelector('#scene-2 h2').textContent = CONTENT.scene2.heading;
+    $('btn-yes').textContent = CONTENT.scene2.yes;
+
+    $('btn-continue-3').textContent = CONTENT.scene3.continueBtn;
+    $('btn-continue-4').textContent = CONTENT.scene4.continueBtn;
+
+    document.querySelector('#scene-5 h2').textContent = CONTENT.scene5.heading;
+    $('label-day').textContent = CONTENT.scene5.labels.day;
+    $('label-vibe').textContent = CONTENT.scene5.labels.vibe;
+    $('label-food').textContent = CONTENT.scene5.labels.food;
+    $('btn-submit-plan').textContent = CONTENT.scene5.submitBtn;
+    document.querySelector('#plan-result h3').textContent = CONTENT.scene5.resultHeading;
+  }
+
+  /* ---------- SCENE TRANSITIONS ---------- */
+  function goToScene(next){
+    const current = document.querySelector('.scene.active');
+    const nextEl = $('scene-' + next);
+    if (!nextEl || current === nextEl) return;
+
+    if (prefersReducedMotion){
+      if (current) current.classList.remove('active');
+      nextEl.classList.add('active');
+      state.scene = next;
+      onSceneEnter(next);
+      return;
+    }
+
+    if (current) current.classList.remove('active');
+
+    nextEl.style.transition = 'none';
+    nextEl.style.transform = 'rotateY(-90deg)';
+    nextEl.style.opacity = '0';
+    void nextEl.offsetWidth;
+    nextEl.style.transition = '';
+
+    requestAnimationFrame(() => {
+      nextEl.classList.add('active');
+      nextEl.style.transform = '';
+      nextEl.style.opacity = '';
+    });
+
+    state.scene = next;
+    setTimeout(() => onSceneEnter(next), 500);
+  }
+
+  function onSceneEnter(n){
+    if (n === 2) setupScene2();
+    if (n === 3) setupScene3();
+    if (n === 4) enterScene4();
+    if (n === 5) setupScene5();
+  }
+
+  /* ---------- SCENE 2: THE QUESTION ---------- */
+  let yesBaseWidth = null;
+
+  function setupScene2(){
+    state.noClicks = 0;
+    const noBtn = $('btn-no');
+    const yesBtn = $('btn-yes');
+
+    noBtn.style.display = '';
+    noBtn.style.opacity = '1';
+    noBtn.style.pointerEvents = '';
+    noBtn.removeAttribute('aria-hidden');
+    noBtn.textContent = CONTENT.scene2.noLabels[0];
+    noBtn.style.transform = 'translateZ(6px) rotateY(0deg)';
+
+    yesBaseWidth = null;
+    yesBtn.style.transform = 'translate(-50%,-50%) translateZ(6px) scale(1)';
+
+    requestAnimationFrame(() => {
+      const pg = $('playground');
+      const pgRect = pg.getBoundingClientRect();
+      const btnRect = noBtn.getBoundingClientRect();
+      const x = Math.max(0, pgRect.width - btnRect.width - 12);
+      noBtn.style.left = x + 'px';
+      noBtn.style.top = '12px';
+    });
+  }
+
+  function rectsOverlap(x, y, w, h, yesRect, pgRect){
+    const yesX = yesRect.left - pgRect.left;
+    const yesY = yesRect.top - pgRect.top;
+    const pad = 12;
+    return !(x + w + pad < yesX || x > yesX + yesRect.width + pad ||
+             y + h + pad < yesY || y > yesY + yesRect.height + pad);
+  }
+
+  function repositionNoButton(){
+    const pg = $('playground');
+    const noBtn = $('btn-no');
+    const yesBtn = $('btn-yes');
+    const pgRect = pg.getBoundingClientRect();
+    const noRect = noBtn.getBoundingClientRect();
+    const yesRect = yesBtn.getBoundingClientRect();
+    const maxX = Math.max(0, pgRect.width - noRect.width);
+    const maxY = Math.max(0, pgRect.height - noRect.height);
+    let x = 0, y = 0, tries = 0;
+    do {
+      x = Math.random() * maxX;
+      y = Math.random() * maxY;
+      tries++;
+    } while (tries < 12 && rectsOverlap(x, y, noRect.width, noRect.height, yesRect, pgRect));
+    noBtn.style.left = x + 'px';
+    noBtn.style.top = y + 'px';
+    if (!prefersReducedMotion){
+      const spins = 360 * (1 + Math.floor(Math.random() * 2));
+      noBtn.style.transform = 'translateZ(6px) rotateY(' + spins + 'deg)';
+    }
+  }
+
+  function scaleYes(){
+    const yesBtn = $('btn-yes');
+    if (yesBaseWidth === null) yesBaseWidth = yesBtn.getBoundingClientRect().width || 100;
+    const rawScale = 1 + state.noClicks * 0.15;
+    const maxScaleForViewport = Math.max(1, (window.innerWidth - 32) / yesBaseWidth);
+    const scale = Math.min(rawScale, 2.2, maxScaleForViewport);
+    const z = Math.min(6 + state.noClicks * 6, 60);
+    yesBtn.style.transform = 'translate(-50%,-50%) translateZ(' + z + 'px) scale(' + scale.toFixed(2) + ')';
+  }
+
+  function moveNoButton(){
+    state.noClicks++;
+    const labels = CONTENT.scene2.noLabels;
+    const noBtn = $('btn-no');
+
+    if (state.noClicks >= 6){
+      noBtn.style.transition = 'transform .3s ease, opacity .3s ease';
+      noBtn.style.transform += ' scale(0)';
+      noBtn.style.opacity = '0';
+      noBtn.style.pointerEvents = 'none';
+      noBtn.setAttribute('aria-hidden', 'true');
+      scaleYes();
+      return;
+    }
+
+    noBtn.textContent = labels[state.noClicks];
+    repositionNoButton();
+    scaleYes();
+  }
+
+  /* ---------- SCENE 3: PUZZLES ---------- */
+  function setupScene3(){
+    state.quizIndex = 0;
+    state.score = 0;
+    state.wrongOnCurrent = false;
+    $('result-card').classList.add('hidden');
+    $('quiz-card').classList.remove('hidden');
+    renderQuestion(0, true);
+  }
+
+  function renderQuestion(i, skipFlip){
+    const q = CONTENT.scene3.questions[i];
+    const card = $('quiz-card');
+
+    const doRender = () => {
+      $('quiz-progress').textContent = 'Sawaal ' + (i + 1) + ' / ' + CONTENT.scene3.questions.length;
+      $('quiz-question').textContent = q.text;
+      const optWrap = $('quiz-options');
+      optWrap.innerHTML = '';
+      q.options.forEach((opt, idx) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn-option';
+        btn.textContent = opt;
+        btn.setAttribute('aria-label', opt);
+        btn.addEventListener('click', () => handleAnswer(idx));
+        optWrap.appendChild(btn);
+      });
+      const fb = $('quiz-feedback');
+      fb.textContent = '';
+      fb.className = 'quiz-feedback mt-3';
+    };
+
+    if (skipFlip || prefersReducedMotion){
+      doRender();
+      card.classList.remove('flipping');
+    } else {
+      card.classList.add('flipping');
+      setTimeout(() => {
+        doRender();
+        card.classList.remove('flipping');
+      }, 220);
+    }
+  }
+
+  function handleAnswer(optIndex){
+    const q = CONTENT.scene3.questions[state.quizIndex];
+    const feedback = $('quiz-feedback');
+    const optionButtons = document.querySelectorAll('#quiz-options button');
+
+    if (optIndex === q.correct){
+      feedback.textContent = q.right;
+      feedback.className = 'quiz-feedback right mt-3';
+      optionButtons.forEach((b) => { b.disabled = true; });
+      if (!state.wrongOnCurrent) state.score++;
+      setTimeout(() => {
+        state.quizIndex++;
+        state.wrongOnCurrent = false;
+        if (state.quizIndex >= CONTENT.scene3.questions.length){
+          showResult();
+        } else {
+          renderQuestion(state.quizIndex);
+        }
+      }, 1200);
+    } else {
+      state.wrongOnCurrent = true;
+      feedback.textContent = q.roast;
+      feedback.className = 'quiz-feedback wrong mt-3';
+    }
+  }
+
+  function showResult(){
+    $('quiz-card').classList.add('hidden');
+    const rc = $('result-card');
+    rc.classList.remove('hidden');
+    const total = CONTENT.scene3.questions.length;
+    $('result-score').textContent = state.score + '/' + total;
+    const ranks = CONTENT.scene3.ranks;
+    let rankText;
+    if (state.score === 4) rankText = ranks[4];
+    else if (state.score === 3) rankText = ranks[3];
+    else if (state.score === 2) rankText = ranks[2];
+    else rankText = ranks.low;
+    $('result-rank').textContent = rankText;
+  }
+
+  /* ---------- SCENE 4: THE SORRY ---------- */
+  function burstConfetti(){
+    if (typeof confetti !== 'function') return;
+    const count = window.innerWidth < 640 ? 80 : 150;
+    try {
+      confetti({
+        particleCount: count,
+        spread: 80,
+        startVelocity: 35,
+        origin: { y: 0.5 },
+        colors: ['#E8909C', '#F6D3D9', '#D97A8A', '#FDF6EC']
+      });
+    } catch (e) { /* fail silently */ }
+  }
+
+  function enterScene4(){
+    burstConfetti();
+    const env = $('envelope-reveal');
+    const card = $('sorry-card');
+    env.classList.remove('open');
+    card.classList.remove('revealed', 'floating');
+    setTimeout(() => env.classList.add('open'), 300);
+    setTimeout(() => card.classList.add('revealed'), 800);
+    setTimeout(() => card.classList.add('floating'), 1450);
+    revealMusic();
+  }
+
+  /* ---------- SCENE 5: THE PLAN ---------- */
+  function setupScene5(){
+    $('plan-form').classList.remove('hidden');
+    $('plan-result').classList.add('hidden');
+    $('plan-hint').textContent = '';
+    renderChips();
+  }
+
+  function renderChips(){
+    ['day', 'vibe', 'food'].forEach((group) => {
+      const container = document.querySelector('.chip-row[data-group="' + group + '"]');
+      container.innerHTML = '';
+      CONTENT.scene5.options[group].forEach((opt) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'chip' + (state.answers[group] === opt ? ' selected' : '');
+        btn.textContent = opt;
+        btn.setAttribute('aria-pressed', state.answers[group] === opt ? 'true' : 'false');
+        btn.setAttribute('aria-label', opt);
+        btn.addEventListener('click', () => {
+          state.answers[group] = opt;
+          renderChips();
+        });
+        container.appendChild(btn);
+      });
+    });
+  }
+
+  async function submitPlan(){
+    const { day, vibe, food } = state.answers;
+    const hint = $('plan-hint');
+    if (!day || !vibe || !food){
+      hint.textContent = CONTENT.scene5.hintMissing;
+      return;
+    }
+    hint.textContent = '';
+    try {
+      await fetch(CONTENT.scene5.formspreeUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({ day, vibe, food })
+      });
+    } catch (e) { /* offline or failed — still show confirmation */ }
+
+    $('plan-form').classList.add('hidden');
+    $('plan-result').classList.remove('hidden');
+    $('plan-summary').textContent = day + ' · ' + vibe + ' · ' + food;
+  }
+
+  /* ---------- AUDIO ---------- */
+  const bgm = $('bgm');
+  let audioUnlocked = false;
+
+  function unlockAudio(){
+    if (audioUnlocked) return;
+    audioUnlocked = true;
+    bgm.muted = true;
+    bgm.play().catch(() => {});
+  }
+
+  function revealMusic(){
+    bgm.muted = false;
+    bgm.play().catch(() => {});
+    $('btn-mute').classList.remove('hidden');
+  }
+
+  $('btn-mute').addEventListener('click', () => {
+    bgm.muted = !bgm.muted;
+    const btn = $('btn-mute');
+    btn.textContent = bgm.muted ? '🔇' : '🔊';
+    btn.setAttribute('aria-pressed', String(!bgm.muted));
+    btn.setAttribute('aria-label', bgm.muted ? 'Unmute music' : 'Mute music');
+  });
+
+  /* ---------- TILT (desktop pointer / mobile deviceorientation) ---------- */
+  const Tilt = (function(){
+    let tx = 0, ty = 0, curX = 0, curY = 0;
+    function loop(){
+      const el = $('tilt-layer');
+      if (el){
+        curX += (tx - curX) * 0.12;
+        curY += (ty - curY) * 0.12;
+        el.style.transform = 'rotateX(' + curY.toFixed(2) + 'deg) rotateY(' + curX.toFixed(2) + 'deg)';
+      }
+      requestAnimationFrame(loop);
+    }
+    function start(){
+      if (prefersReducedMotion) return;
+      requestAnimationFrame(loop);
+      const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+      if (!isTouch){
+        window.addEventListener('pointermove', (e) => {
+          const nx = (e.clientX / window.innerWidth) * 2 - 1;
+          const ny = (e.clientY / window.innerHeight) * 2 - 1;
+          tx = nx * 6;
+          ty = -ny * 6;
+        });
+      }
+    }
+    function requestMobilePermission(){
+      if (prefersReducedMotion) return;
+      const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+      if (!isTouch) return;
+      const onOrient = (e) => {
+        if (e.gamma == null || e.beta == null) return;
+        tx = Math.max(-6, Math.min(6, e.gamma * 0.15));
+        ty = Math.max(-6, Math.min(6, (e.beta - 45) * 0.08));
+      };
+      try {
+        const DOE = window.DeviceOrientationEvent;
+        if (DOE && typeof DOE.requestPermission === 'function'){
+          DOE.requestPermission().then((res) => {
+            if (res === 'granted') window.addEventListener('deviceorientation', onOrient);
+          }).catch(() => {});
+        } else if (DOE){
+          window.addEventListener('deviceorientation', onOrient);
+        }
+      } catch (e) { /* unavailable — skip silently */ }
+    }
+    return { start, requestMobilePermission };
+  })();
+
+  /* ---------- THREE.JS BACKGROUND ---------- */
+  function initThree(){
+    if (prefersReducedMotion) return;
+    try {
+      if (!window.THREE) return;
+      const canvas = $('bg-canvas');
+      const renderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true, antialias: true });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.setSize(window.innerWidth, window.innerHeight);
+
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 100);
+      camera.position.z = 20;
+
+      const count = window.innerWidth < 640 ? 22 : 60;
+      const geo = new THREE.IcosahedronGeometry(0.45, 0);
+      const mat = new THREE.MeshBasicMaterial({ color: 0xE8909C, transparent: true, opacity: 0.45, wireframe: true });
+      const particles = [];
+      for (let i = 0; i < count; i++){
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.set((Math.random() - 0.5) * 30, (Math.random() - 0.5) * 30, (Math.random() - 0.5) * 20);
+        mesh.userData.offset = Math.random() * Math.PI * 2;
+        scene.add(mesh);
+        particles.push(mesh);
+      }
+
+      let raf = null;
+      function animate(t){
+        particles.forEach((p) => {
+          p.rotation.x += 0.002;
+          p.rotation.y += 0.003;
+          p.position.y += Math.sin((t || 0) * 0.001 + p.userData.offset) * 0.003;
+        });
+        renderer.render(scene, camera);
+        raf = requestAnimationFrame(animate);
+      }
+      raf = requestAnimationFrame(animate);
+
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden){
+          if (raf) cancelAnimationFrame(raf);
+          raf = null;
+        } else if (!raf){
+          raf = requestAnimationFrame(animate);
+        }
+      });
+
+      window.addEventListener('resize', () => {
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+      });
+    } catch (e) {
+      /* WebGL unavailable — fail silently */
+    }
+  }
+
+  /* ---------- WIRE UP ---------- */
+  function wireEvents(){
+    $('btn-open').addEventListener('click', () => {
+      unlockAudio();
+      Tilt.requestMobilePermission();
+      goToScene(2);
+    });
+    $('btn-yes').addEventListener('click', () => goToScene(3));
+    $('btn-no').addEventListener('click', moveNoButton);
+    $('btn-continue-3').addEventListener('click', () => goToScene(4));
+    $('btn-continue-4').addEventListener('click', () => goToScene(5));
+    $('btn-submit-plan').addEventListener('click', submitPlan);
+  }
+
+  /* ---------- INIT ---------- */
+  paintStaticContent();
+  wireEvents();
+  Tilt.start();
+  initThree();
+})();
+</script>
+</body>
+</html>
